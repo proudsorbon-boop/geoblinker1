@@ -28,6 +28,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                implementation("co.touchlab:stately-common:2.0.6")
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material3)
