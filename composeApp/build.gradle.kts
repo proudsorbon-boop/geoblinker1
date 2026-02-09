@@ -13,44 +13,76 @@ kotlin {
         }
     }
 
+    // ДОБАВЛЕНО: Настройки для iOS
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "ComposeApp"
+            isStatic = true
+        }
+    }
 
     sourceSets {
-        commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
+        val commonMain by getting {
+            dependencies {
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
 
-            // База данных
-            implementation("app.cash.sqldelight:runtime:2.0.1")
-            implementation("app.cash.sqldelight:coroutines-extensions:2.0.1")
+                // База данных
+                implementation("app.cash.sqldelight:runtime:2.0.1")
+                implementation("app.cash.sqldelight:coroutines-extensions:2.0.1")
 
-            // Сериализация и время
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+                // Сериализация и время
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
 
-            // Voyager (Навигация)
-            implementation(libs.voyager.navigator)
-            implementation(libs.voyager.screenmodel)
-            implementation(libs.voyager.transitions)
-            implementation(libs.voyager.koin) // <--- ВОТ ЭТОГО НЕ ХВАТАЛО!
+                // Voyager
+                implementation(libs.voyager.navigator)
+                implementation(libs.voyager.screenmodel)
+                implementation(libs.voyager.transitions)
+                implementation(libs.voyager.koin)
 
-            // Koin (Внедрение зависимостей)
-            implementation("io.insert-koin:koin-core:3.5.3")
-            implementation("io.insert-koin:koin-compose:1.1.2")
+                // Koin
+                implementation("io.insert-koin:koin-core:3.5.3")
+                implementation("io.insert-koin:koin-compose:1.1.2")
 
-            // Ktor (Сеть)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.serialization.kotlinx.json)
-            implementation(libs.ktor.client.logging)
-
+                // Ktor
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.ktor.client.logging)
+            }
         }
-        androidMain.dependencies {
-            implementation("androidx.activity:activity-compose:1.8.2")
-            implementation("app.cash.sqldelight:android-driver:2.0.1")
-            implementation("io.insert-koin:koin-android:3.5.3")
+
+        val androidMain by getting {
+            dependencies {
+                implementation("androidx.activity:activity-compose:1.8.2")
+                implementation("app.cash.sqldelight:android-driver:2.0.1")
+                implementation("io.insert-koin:koin-android:3.5.3")
+            }
+        }
+
+        // ДОБАВЛЕНО: Зависимости для iOS
+        val iosX64Main by getting
+        val iosArm64Main by getting
+        val iosSimulatorArm64Main by getting
+
+        val iosMain by creating {
+            dependsOn(commonMain)
+            iosX64Main.dependsOn(this)
+            iosArm64Main.dependsOn(this)
+            iosSimulatorArm64Main.dependsOn(this)
+
+            dependencies {
+                implementation("io.ktor:ktor-client-darwin:2.3.7") // Движок сети для iOS
+                implementation("app.cash.sqldelight:native-driver:2.0.1") // Драйвер БД для iOS
+            }
         }
     }
 }
