@@ -1,0 +1,13 @@
+CREATE TABLE signals (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    deviceId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    dateTime INTEGER NOT NULL,
+    isSeen INTEGER NOT NULL DEFAULT 0
+);
+
+getAllDeviceSignals:
+SELECT * FROM signals WHERE deviceId = ?;
+
+updateSignalSeen:
+UPDATE signals SET isSeen = ? WHERE id = ?;
