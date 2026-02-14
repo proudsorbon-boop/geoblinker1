@@ -13,11 +13,12 @@ import org.example.geoblinker.domain.repository.AuthRepository
 import org.example.geoblinker.data.device.DeviceRepository
 import org.example.geoblinker.data.device.DeviceRepositoryImpl
 import org.example.geoblinker.presentation.features.auth.AuthViewModel
+import org.example.geoblinker.presentation.features.auth.LoginViewModel // <--- ДОБАВИЛ ИМПОРТ
 import org.example.geoblinker.presentation.features.devices.DevicesViewModel
-// Импорты нашего экрана
 import org.example.geoblinker.presentation.features.devicesignal.DeviceListSignalViewModel
 import org.example.geoblinker.db.AppDatabase
 import org.koin.dsl.module
+
 
 val networkModule = module {
     single {
@@ -45,7 +46,10 @@ val screenModelModule = module {
     factory { AuthViewModel(get(), get()) }
     factory { DevicesViewModel(get()) }
 
-    // НАША VIEW MODEL
+    // <--- ДОБАВИЛ НАШ НОВЫЙ ЭКРАН ВХОДА
+    factory { LoginViewModel() }
+
+    // НАША VIEW MODEL ДЛЯ СПИСКА СИГНАЛОВ
     factory {
         DeviceListSignalViewModel(
             signalQueries = get(),

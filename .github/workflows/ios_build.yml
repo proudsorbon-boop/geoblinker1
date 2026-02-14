@@ -1,28 +1,105 @@
-name: iOS Build Check
+name: Deploy iOS to TestFlight
 
 on:
   push:
-    branches: [ "master", "main" ]
-  pull_request:
-    branches: [ "master", "main" ]
+    branches: [ "main" ] # Сборка будет запускаться автоматически при пуше в main
+  workflow_dispatch: # Добавляем кнопку, чтобы ты мог запускать сборку вручную из интерфейса GitHub
 
 jobs:
-  build-ios-framework:
+  build-and-deploy:
     runs-on: macos-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
-          java-version: '17'
+          java-version: '17' # KMP обычно требует 17 джаву
           distribution: 'zulu'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Install Apple Certificate and Provisioning Profile
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+          # Расшифровываем сертификаты из base64
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
 
-      - name: Build Kotlin Framework for iOS (Arm64)
-        run: ./gradlew :composeApp:linkReleaseFrameworkIosArm64
+          # Создаем временную связку ключей (keychain) на сервере macOS
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Импортируем сертификат
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Устанавливаем provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+
+      - name: Build and Archive app
+        run: |
+          cd iosApp
+          # Если вы используете CocoaPods, замени '-project iosApp.xcodeproj' на '-workspace iosApp.xcworkspace'
+          xcodebuild clean archive \
+            -project iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -archivePath $PWD/build/iosApp.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="GeoBlinker_New" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
+
+      - name: Export IPA
+        env:
+          EXPORT_OPTIONS_PLIST: ${{ runner.temp }}/ExportOptions.plist
+        run: |
+          # Создаем файл настроек экспорта
+          cat << EOF > $EXPORT_OPTIONS_PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>destination</key>
+              <string>export</string>
+              <key>manageAppVersionAndBuildNumber</key>
+              <true/>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>org.geo.geoblinker.GeoBlinker</key>
+                  <string>GeoBlinker_New</string>
+              </dict>
+          </dict>
+          </plist>
+          EOF
+          
+          cd iosApp
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/iosApp.xcarchive \
+            -exportOptionsPlist $EXPORT_OPTIONS_PLIST \
+            -exportPath $PWD/build
+
+      - name: Upload to TestFlight
+        env:
+          API_KEY: ${{ secrets.APP_STORE_PRIVATE_KEY }}
+          ISSUER_ID: ${{ secrets.APP_STORE_ISSUER_ID }}
+          KEY_ID: ${{ secrets.APP_STORE_KEY_ID }}
+        run: |
+          # Авторизуемся в App Store Connect и заливаем билд
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$API_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          
+          cd iosApp/build
+          xcrun altool --upload-app -f iosApp.ipa -t ios --apiKey $KEY_ID --apiIssuer $ISSUER_ID

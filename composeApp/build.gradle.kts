@@ -28,6 +28,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                implementation(compose.materialIconsExtended)
                 implementation("co.touchlab:stately-common:2.0.6")
                 implementation(compose.runtime)
                 implementation(compose.foundation)
@@ -92,7 +93,7 @@ android {
     namespace = "org.example.geoblinker"
     compileSdk = 34
     defaultConfig {
-        applicationId = "org.example.geoblinker"
+        applicationId = "org.geo.geoblinker.GeoBlinker"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
